@@ -1,9 +1,16 @@
 import streamlit as st
 import pandas as pd
 import requests
-import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime, timedelta
+
+# Importar Plotly de forma segura
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    st.error("⚠️ Plotly no está disponible. Instalando dependencias...")
+    PLOTLY_AVAILABLE = False
 
 
 def cargar_datos_api():
