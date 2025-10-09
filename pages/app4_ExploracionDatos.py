@@ -1,14 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import numpy as np
-from datetime import datetime, timedelta
-import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy import stats
+from datetime import datetime
 
 
 def cargar_datos_api():
@@ -62,16 +55,7 @@ def cargar_datos_api():
                 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'
             })
             df['mes'] = df['fecha'].dt.month_name()
-            df['semana'] = df['fecha'].dt.isocalendar().week
-            df['hora_entrada_num'] = df['hora_entrada_dt'].dt.hour + df['hora_entrada_dt'].dt.minute/60
-            df['hora_salida_num'] = df['hora_salida_dt'].dt.hour + df['hora_salida_dt'].dt.minute/60
-            
-            # Categorizar productividad
-            df['categoria_productividad'] = pd.cut(
-                df['duracion_horas'], 
-                bins=[0, 7, 10, float('inf')], 
-                labels=['Baja (<7h)', 'Normal (7-10h)', 'Alta (>10h)']
-            )
+            df['mes_numero'] = df['fecha'].dt.month
             
             return df
         else:
@@ -82,835 +66,651 @@ def cargar_datos_api():
         return None
 
 
-def mostrar_estadisticas_descriptivas(df):
-    """Mostrar estadísticas descriptivas completas"""
-    st.subheader("📈 Estadísticas Descriptivas")
+def mostrar_resumen_general(df):
+    """Mostrar resumen general de los datos"""
+    st.subheader("📊 Resumen General de los Datos")
     
-    with st.expander("🔍 ¿Qué nos dicen las estadísticas descriptivas?", expanded=False):
+    with st.expander("🔍 ¿Qué nos dice el resumen general?", expanded=False):
         st.markdown("""
-        Las **estadísticas descriptivas** nos ayudan a entender la distribución y comportamiento 
-        de nuestros datos de horarios laborales:
+        ### 📋 **Métricas Fundamentales**
+        Estas métricas te dan una **vista panorámica** de todo el conjunto de datos:
         
-        - **Media**: Valor promedio de horas trabajadas
-        - **Mediana**: Valor central que divide los datos en dos mitades iguales
-        - **Desviación estándar**: Mide la variabilidad de las horas trabajadas
-        - **Percentiles**: Nos indican cómo se distribuyen los valores
-        - **Coeficiente de variación**: Compara la variabilidad entre diferentes grupos
+        - **📝 Total de Registros**: Cantidad total de entradas de horarios en la base de datos
+        - **👥 Empleados Únicos**: Número de personas diferentes que han registrado horarios
+        - **📅 Días Registrados**: Cantidad de días únicos con actividad laboral
+        - **🏢 Áreas/Promedio**: Número de departamentos o promedio de horas por día
+        
+        ### 🎯 **¿Por qué es importante?**
+        - Te permite **evaluar el volumen** de información disponible
+        - Identifica la **cobertura temporal** de los datos
+        - Muestra la **diversidad organizacional** (empleados y áreas)
+        - Establece el **contexto base** para análisis más profundos
         """)
     
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total de Registros", len(df))
+    
+    with col2:
+        st.metric("Empleados Únicos", df['nombre'].nunique())
+    
+    with col3:
+        st.metric("Días Registrados", df['fecha'].nunique())
+    
+    with col4:
+        if 'area' in df.columns:
+            st.metric("Áreas", df['area'].nunique())
+        else:
+            st.metric("Promedio Horas/Día", f"{df['duracion_horas'].mean():.1f}")
+
+
+def mostrar_estadisticas_basicas(df):
+    """Mostrar estadísticas descriptivas básicas"""
+    st.subheader("📈 Estadísticas Básicas")
+    
+    with st.expander("📊 ¿Cómo interpretar las estadísticas descriptivas?", expanded=False):
+        st.markdown("""
+        ### 🧮 **Métricas Estadísticas Explicadas**
+        
+        - **📊 Conteo**: Número total de registros válidos
+        - **📈 Promedio**: Valor medio de horas trabajadas (tendencia central)
+        - **📏 Desviación Estándar**: Mide qué tan dispersos están los datos del promedio
+        - **⬇️ Mínimo**: La jornada más corta registrada
+        - **📊 Percentil 25%**: El 25% de las jornadas duran menos que este valor
+        - **🎯 Mediana (50%)**: Valor que divide los datos por la mitad
+        - **📊 Percentil 75%**: El 75% de las jornadas duran menos que este valor
+        - **⬆️ Máximo**: La jornada más larga registrada
+        
+        ### 💡 **¿Qué puedes descubrir?**
+        - Si hay **consistencia** en los horarios (desviación baja = más uniforme)
+        - Si existen **valores atípicos** (diferencia grande entre min/max y percentiles)
+        - El **rango normal** de trabajo (entre percentil 25% y 75%)
+        - Si la distribución es **simétrica** (promedio ≈ mediana) o **sesgada**
+        """)
+    
+    # Estadísticas de horas trabajadas
     if 'duracion_horas' in df.columns:
+        st.write("**⏱️ Horas Trabajadas - Estadísticas Descriptivas**")
+        
+        stats_horas = df['duracion_horas'].describe()
+        
+        # Crear tabla de estadísticas
+        stats_df = pd.DataFrame({
+            'Métrica': ['Conteo', 'Promedio', 'Desviación Estándar', 'Mínimo', 'Percentil 25%', 'Mediana', 'Percentil 75%', 'Máximo'],
+            'Valor': [
+                f"{stats_horas['count']:.0f}",
+                f"{stats_horas['mean']:.2f} horas",
+                f"{stats_horas['std']:.2f} horas",
+                f"{stats_horas['min']:.2f} horas",
+                f"{stats_horas['25%']:.2f} horas",
+                f"{stats_horas['50%']:.2f} horas",
+                f"{stats_horas['75%']:.2f} horas",
+                f"{stats_horas['max']:.2f} horas"
+            ]
+        })
+        
+        st.dataframe(stats_df, use_container_width=True, hide_index=True)
+        
+        # Agregar insights automáticos
+        promedio = df['duracion_horas'].mean()
+        mediana = df['duracion_horas'].median()
+        desv_std = df['duracion_horas'].std()
+        
+        st.write("**📋 Interpretación Automática:**")
         col1, col2 = st.columns(2)
         
         with col1:
-            st.write("**🕐 Análisis de Horas Trabajadas**")
-            stats_horas = df['duracion_horas'].describe()
-            
-            # Crear un DataFrame más legible
-            stats_df = pd.DataFrame({
-                'Métrica': ['Conteo', 'Promedio', 'Desv. Estándar', 'Mínimo', '25%', '50% (Mediana)', '75%', 'Máximo'],
-                'Valor': [
-                    f"{stats_horas['count']:.0f} registros",
-                    f"{stats_horas['mean']:.2f} horas",
-                    f"{stats_horas['std']:.2f} horas",
-                    f"{stats_horas['min']:.2f} horas",
-                    f"{stats_horas['25%']:.2f} horas",
-                    f"{stats_horas['50%']:.2f} horas",
-                    f"{stats_horas['75%']:.2f} horas",
-                    f"{stats_horas['max']:.2f} horas"
-                ]
-            })
-            st.dataframe(stats_df, use_container_width=True, hide_index=True)
+            if desv_std < 1:
+                st.success("✅ **Horarios muy consistentes** (baja variabilidad)")
+            elif desv_std < 2:
+                st.info("📊 **Horarios moderadamente consistentes**")
+            else:
+                st.warning("⚠️ **Horarios muy variables** (alta dispersión)")
         
         with col2:
-            st.write("**📊 Métricas Adicionales**")
-            # Calcular métricas adicionales
-            cv = (df['duracion_horas'].std() / df['duracion_horas'].mean()) * 100
-            rango_iqr = df['duracion_horas'].quantile(0.75) - df['duracion_horas'].quantile(0.25)
-            
-            metricas_adicionales = pd.DataFrame({
-                'Métrica': [
-                    'Coef. Variación', 
-                    'Rango IQR', 
-                    'Asimetría (Skewness)',
-                    'Curtosis',
-                    'Empleados únicos',
-                    'Días únicos'
-                ],
-                'Valor': [
-                    f"{cv:.2f}%",
-                    f"{rango_iqr:.2f} horas",
-                    f"{df['duracion_horas'].skew():.2f}",
-                    f"{df['duracion_horas'].kurtosis():.2f}",
-                    f"{df['nombre'].nunique()} personas",
-                    f"{df['fecha'].nunique()} días"
-                ]
-            })
-            st.dataframe(metricas_adicionales, use_container_width=True, hide_index=True)
+            if abs(promedio - mediana) < 0.5:
+                st.success("✅ **Distribución balanceada** (promedio ≈ mediana)")
+            else:
+                st.info("📈 **Distribución con sesgo** (promedio ≠ mediana)")
 
 
-def mostrar_analisis_temporal(df_filtrado):
-    """Análisis temporal detallado"""
-    st.subheader("⏰ Análisis Temporal Avanzado")
+def mostrar_analisis_empleados(df):
+    """Análisis por empleado"""
+    st.subheader("👥 Análisis por Empleado")
     
-    with st.expander("📅 Importancia del análisis temporal", expanded=False):
+    with st.expander("🔍 ¿Cómo entender el análisis por empleado?", expanded=False):
         st.markdown("""
-        El **análisis temporal** nos permite identificar:
-        - **Patrones estacionales**: ¿Hay días más productivos?
-        - **Tendencias**: ¿Está aumentando o disminuyendo la productividad?
-        - **Ciclos**: ¿Existen patrones repetitivos?
-        - **Anomalías**: ¿Hay días o períodos inusuales?
+        ### 👤 **Métricas Individuales Explicadas**
+        
+        - **📅 Días Trabajados**: Cuántos días ha registrado horarios cada empleado
+        - **⭐ Promedio Horas**: Horas promedio por jornada de cada persona
+        - **⬇️ Min Horas**: La jornada más corta de cada empleado
+        - **⬆️ Max Horas**: La jornada más larga de cada empleado
+        - **🏆 Total Horas**: Suma total de todas las horas trabajadas
+        - **📅 Primera/Última Fecha**: Rango temporal de actividad
+        
+        ### 🎯 **Insights que puedes obtener:**
+        - **Consistencia individual**: Diferencia entre min y max horas
+        - **Productividad relativa**: Comparar total de horas entre empleados
+        - **Patrones de asistencia**: Frecuencia de registro por persona
+        - **Identificación de top performers**: Empleados más productivos
+        - **Detección de irregularidades**: Jornadas excesivamente largas o cortas
+        
+        ### 📊 **Tabla Top 10**
+        Muestra los **empleados más productivos** basándose en el total de horas trabajadas,
+        incluyendo métricas clave para comparar su rendimiento.
+        """)
+    
+    # Resumen por empleado
+    empleados_stats = df.groupby('nombre').agg({
+        'duracion_horas': ['count', 'mean', 'min', 'max', 'sum'],
+        'fecha': ['min', 'max']
+    }).round(2)
+    
+    # Aplanar las columnas multi-nivel
+    empleados_stats.columns = ['Días_Trabajados', 'Promedio_Horas', 'Min_Horas', 'Max_Horas', 'Total_Horas', 'Primera_Fecha', 'Última_Fecha']
+    empleados_stats = empleados_stats.reset_index()
+    
+    st.write("**Resumen de Trabajo por Empleado**")
+    st.dataframe(empleados_stats, use_container_width=True)
+    
+    # Top empleados por horas trabajadas
+    st.write("**Top 10 Empleados por Total de Horas Trabajadas**")
+    top_empleados = empleados_stats.nlargest(10, 'Total_Horas')[['nombre', 'Total_Horas', 'Días_Trabajados', 'Promedio_Horas']]
+    st.dataframe(top_empleados, use_container_width=True, hide_index=True)
+    
+    # Insights automáticos para empleados
+    if len(top_empleados) > 0:
+        mejor_empleado = top_empleados.iloc[0]
+        total_empleados = len(empleados_stats)
+        
+        st.write("**💡 Insights Destacados:**")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.info(f"🏆 **Top Performer**: {mejor_empleado['nombre']}")
+            st.write(f"• Total: {mejor_empleado['Total_Horas']:.1f} horas")
+            st.write(f"• Promedio: {mejor_empleado['Promedio_Horas']:.1f} h/día")
+        
+        with col2:
+            promedio_general = empleados_stats['Total_Horas'].mean()
+            if mejor_empleado['Total_Horas'] > promedio_general * 1.5:
+                st.success("⭐ **Productividad excepcional** vs. promedio general")
+            else:
+                st.info("📊 **Rendimiento dentro del rango normal**")
+
+
+def mostrar_analisis_temporal(df):
+    """Análisis temporal básico"""
+    st.subheader("📅 Análisis Temporal")
+    
+    with st.expander("⏰ ¿Qué revelan los patrones temporales?", expanded=False):
+        st.markdown("""
+        ### 📊 **Análisis por Día de la Semana**
+        
+        **¿Qué mide cada métrica?**
+        - **📝 Número de Registros**: Cuántos empleados trabajaron cada día
+        - **⏱️ Promedio Horas**: Duración promedio de las jornadas por día
+        - **🏆 Total Horas**: Suma de todas las horas trabajadas ese día
+        
+        **🔍 Patrones que puedes identificar:**
+        - **Días más productivos**: ¿Lunes o viernes son diferentes?
+        - **Consistencia semanal**: ¿Hay días con menor actividad?
+        - **Carga de trabajo**: ¿Se concentra en días específicos?
+        
+        ### 📆 **Análisis por Mes**
+        (Solo aparece si hay datos de múltiples meses)
+        
+        **💡 Insights estacionales:**
+        - **Variaciones mensuales** en productividad
+        - **Tendencias temporales** de largo plazo  
+        - **Picos y valles** de actividad laboral
+        - **Planificación de recursos** según estacionalidad
+        
+        ### 🎯 **¿Para qué usar esta información?**
+        - **Optimizar horarios** según días más productivos
+        - **Planificar recursos** humanos por día/mes
+        - **Identificar necesidades** de personal por períodos
+        - **Detectar patrones** de ausentismo o sobretiempo
         """)
     
     # Análisis por día de la semana
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Por Día Semana", "📈 Tendencias", "🔄 Patrones Horarios", "📉 Análisis Series"])
+    st.write("**Trabajo por Día de la Semana**")
+    dias_stats = df.groupby('dia_semana_es').agg({
+        'duracion_horas': ['count', 'mean', 'sum']
+    }).round(2)
     
-    with tab1:
-        st.write("**Productividad por Día de la Semana**")
-        
-        # Análisis estadístico por día
-        dias_stats = df_filtrado.groupby('dia_semana_es')['duracion_horas'].agg([
-            'count', 'mean', 'std', 'median', 'min', 'max'
-        ]).round(2)
-        
-        # Reordenar días de la semana
-        orden_dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-        dias_stats = dias_stats.reindex([d for d in orden_dias if d in dias_stats.index])
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Gráfico de barras con error bars
-            fig_dias = go.Figure()
-            
-            fig_dias.add_trace(go.Bar(
-                x=dias_stats.index,
-                y=dias_stats['mean'],
-                error_y=dict(type='data', array=dias_stats['std']),
-                marker_color='skyblue',
-                name='Promedio ± Desv. Std'
-            ))
-            
-            fig_dias.update_layout(
-                title="Horas Promedio por Día (con Desviación Estándar)",
-                xaxis_title="Día de la Semana",
-                yaxis_title="Horas Trabajadas",
-                showlegend=False
-            )
-            
-            st.plotly_chart(fig_dias, use_container_width=True)
-        
-        with col2:
-            # Box plot para ver distribuciones
-            fig_box = px.box(
-                df_filtrado, 
-                x='dia_semana_es', 
-                y='duracion_horas',
-                title="Distribución de Horas por Día",
-                category_orders={'dia_semana_es': orden_dias}
-            )
-            fig_box.update_layout(xaxis_title="Día de la Semana", yaxis_title="Horas")
-            st.plotly_chart(fig_box, use_container_width=True)
-        
-        # Tabla resumen
-        st.write("**Estadísticas Detalladas por Día**")
-        dias_stats.columns = ['Registros', 'Promedio', 'Desv.Std', 'Mediana', 'Mínimo', 'Máximo']
-        st.dataframe(dias_stats, use_container_width=True)
-        
-        # Insights automáticos
-        mejor_dia = dias_stats['Promedio'].idxmax()
-        peor_dia = dias_stats['Promedio'].idxmin()
-        st.info(f"💡 **Insight**: {mejor_dia} es el día más productivo ({dias_stats.loc[mejor_dia, 'Promedio']:.2f}h promedio), mientras que {peor_dia} es el menos productivo ({dias_stats.loc[peor_dia, 'Promedio']:.2f}h promedio).")
+    dias_stats.columns = ['Número_Registros', 'Promedio_Horas', 'Total_Horas']
+    dias_stats = dias_stats.reset_index()
     
-    with tab2:
-        st.write("**Tendencias Temporales**")
+    # Ordenar por días de la semana
+    orden_dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    dias_stats['dia_semana_es'] = pd.Categorical(dias_stats['dia_semana_es'], categories=orden_dias, ordered=True)
+    dias_stats = dias_stats.sort_values('dia_semana_es')
+    
+    st.dataframe(dias_stats, use_container_width=True, hide_index=True)
+    
+    # Análisis automático de patrones semanales
+    dia_mas_activo = dias_stats.loc[dias_stats['Total_Horas'].idxmax(), 'dia_semana_es']
+    dia_menos_activo = dias_stats.loc[dias_stats['Total_Horas'].idxmin(), 'dia_semana_es']
+    
+    st.write("**📊 Análisis Semanal Automático:**")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.success(f"🏆 **Día más productivo**: {dia_mas_activo}")
+        horas_max = dias_stats['Total_Horas'].max()
+        st.write(f"• {horas_max:.1f} horas totales")
+    
+    with col2:
+        st.info(f"📉 **Día menos activo**: {dia_menos_activo}")
+        horas_min = dias_stats['Total_Horas'].min()
+        st.write(f"• {horas_min:.1f} horas totales")
+    
+    # Análisis por mes
+    if df['mes'].nunique() > 1:
+        st.write("**Trabajo por Mes**")
+        meses_stats = df.groupby(['mes', 'mes_numero']).agg({
+            'duracion_horas': ['count', 'mean', 'sum']
+        }).round(2)
         
-        # Serie temporal de productividad diaria
-        serie_diaria = df_filtrado.groupby('fecha').agg({
-            'duracion_horas': ['sum', 'mean', 'count'],
+        meses_stats.columns = ['Número_Registros', 'Promedio_Horas', 'Total_Horas']
+        meses_stats = meses_stats.reset_index()
+        meses_stats = meses_stats.sort_values('mes_numero')
+        meses_stats = meses_stats.drop('mes_numero', axis=1)
+        
+        st.dataframe(meses_stats, use_container_width=True, hide_index=True)
+
+
+def mostrar_analisis_areas(df):
+    """Análisis por áreas si existe la columna"""
+    if 'area' in df.columns and df['area'].notna().any():
+        st.subheader("🏢 Análisis por Área")
+        
+        with st.expander("🏗️ ¿Cómo comparar el rendimiento por áreas?", expanded=False):
+            st.markdown("""
+            ### 🏢 **Métricas Departamentales**
+            
+            - **📊 Número de Registros**: Actividad total registrada por área
+            - **⏱️ Promedio Horas**: Duración promedio de jornadas en cada área
+            - **🏆 Total Horas**: Suma completa de horas trabajadas por departamento
+            - **👥 Empleados Únicos**: Cantidad de personas diferentes por área
+            
+            ### 🎯 **Comparaciones Útiles**
+            - **Productividad relativa**: ¿Qué áreas trabajan más horas?
+            - **Eficiencia por empleado**: Ratio horas/persona por área
+            - **Carga de trabajo**: Distribución del esfuerzo organizacional
+            - **Tamaño vs. producción**: Áreas grandes vs. productivas
+            
+            ### 💡 **Decisiones que puedes tomar:**
+            - **Reasignar recursos** entre áreas según necesidades
+            - **Balancear cargas** de trabajo interdepartamentales
+            - **Identificar áreas** que necesitan más personal
+            - **Reconocer departamentos** de alto rendimiento
+            """)
+            
+        st.write("**Comparación de productividad y actividad entre diferentes áreas de trabajo**")
+        
+        areas_stats = df.groupby('area').agg({
+            'duracion_horas': ['count', 'mean', 'sum'],
             'nombre': 'nunique'
         }).round(2)
         
-        serie_diaria.columns = ['Total_Horas', 'Promedio_Horas', 'Num_Registros', 'Empleados_Unicos']
-        serie_diaria = serie_diaria.reset_index()
+        areas_stats.columns = ['Número_Registros', 'Promedio_Horas', 'Total_Horas', 'Empleados_Únicos']
+        areas_stats = areas_stats.reset_index()
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Tendencia de horas totales
-            fig_trend = px.line(
-                serie_diaria, 
-                x='fecha', 
-                y='Total_Horas',
-                title="Evolución de Horas Totales Diarias",
-                markers=True
-            )
-            fig_trend.update_layout(xaxis_title="Fecha", yaxis_title="Horas Totales")
-            st.plotly_chart(fig_trend, use_container_width=True)
-        
-        with col2:
-            # Tendencia de empleados únicos
-            fig_emp = px.line(
-                serie_diaria, 
-                x='fecha', 
-                y='Empleados_Unicos',
-                title="Empleados Activos por Día",
-                markers=True,
-                color_discrete_sequence=['orange']
-            )
-            fig_emp.update_layout(xaxis_title="Fecha", yaxis_title="Número de Empleados")
-            st.plotly_chart(fig_emp, use_container_width=True)
-        
-        # Correlación entre variables
-        if len(serie_diaria) > 1:
-            correlacion = serie_diaria[['Total_Horas', 'Promedio_Horas', 'Empleados_Unicos']].corr()
-            
-            fig_corr = px.imshow(
-                correlacion,
-                text_auto=True,
-                aspect="auto",
-                title="Matriz de Correlación - Variables Temporales"
-            )
-            st.plotly_chart(fig_corr, use_container_width=True)
-    
-    with tab3:
-        st.write("**Patrones de Horarios de Entrada y Salida**")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Histograma de horas de entrada
-            fig_entrada = px.histogram(
-                df_filtrado, 
-                x='hora_entrada_num', 
-                nbins=24,
-                title="Distribución de Horas de Entrada",
-                labels={'hora_entrada_num': 'Hora de Entrada', 'count': 'Frecuencia'}
-            )
-            fig_entrada.update_layout(bargap=0.1)
-            st.plotly_chart(fig_entrada, use_container_width=True)
-        
-        with col2:
-            # Histograma de horas de salida
-            fig_salida = px.histogram(
-                df_filtrado, 
-                x='hora_salida_num', 
-                nbins=24,
-                title="Distribución de Horas de Salida",
-                labels={'hora_salida_num': 'Hora de Salida', 'count': 'Frecuencia'},
-                color_discrete_sequence=['orange']
-            )
-            fig_salida.update_layout(bargap=0.1)
-            st.plotly_chart(fig_salida, use_container_width=True)
-        
-        # Scatter plot: relación entre hora de entrada y duración
-        fig_scatter = px.scatter(
-            df_filtrado, 
-            x='hora_entrada_num', 
-            y='duracion_horas',
-            color='area',
-            title="Relación: Hora de Entrada vs Duración de Jornada",
-            labels={'hora_entrada_num': 'Hora de Entrada', 'duracion_horas': 'Duración (horas)'}
-        )
-        st.plotly_chart(fig_scatter, use_container_width=True)
-    
-    with tab4:
-        st.write("**Análisis de Series Temporales**")
-        
-        if len(serie_diaria) > 7:  # Solo si tenemos suficientes datos
-            # Descomposición de tendencia (simplificada)
-            serie_diaria_sorted = serie_diaria.sort_values('fecha')
-            
-            # Calcular media móvil
-            window = min(7, len(serie_diaria) // 3)
-            if window >= 2:
-                serie_diaria_sorted['Media_Movil'] = serie_diaria_sorted['Total_Horas'].rolling(window=window).mean()
-                
-                fig_ma = go.Figure()
-                fig_ma.add_trace(go.Scatter(
-                    x=serie_diaria_sorted['fecha'],
-                    y=serie_diaria_sorted['Total_Horas'],
-                    mode='lines+markers',
-                    name='Datos Originales',
-                    line=dict(color='lightblue')
-                ))
-                fig_ma.add_trace(go.Scatter(
-                    x=serie_diaria_sorted['fecha'],
-                    y=serie_diaria_sorted['Media_Movil'],
-                    mode='lines',
-                    name=f'Media Móvil ({window} días)',
-                    line=dict(color='red', width=2)
-                ))
-                
-                fig_ma.update_layout(
-                    title=f"Tendencia con Media Móvil ({window} días)",
-                    xaxis_title="Fecha",
-                    yaxis_title="Horas Totales"
-                )
-                st.plotly_chart(fig_ma, use_container_width=True)
-        else:
-            st.info("📊 Se necesitan más datos para realizar análisis de series temporales avanzado.")
+        st.dataframe(areas_stats, use_container_width=True, hide_index=True)
 
 
-def mostrar_analisis_por_grupos(df_filtrado):
-    """Análisis segmentado por diferentes grupos"""
-    st.subheader("👥 Análisis Segmentado")
-    
-    with st.expander("🔬 Análisis por grupos - ¿Por qué es importante?", expanded=False):
-        st.markdown("""
-        El **análisis por grupos** nos permite:
-        - **Comparar performance**: Entre diferentes áreas, roles, empleados
-        - **Identificar outliers**: Empleados o áreas con comportamientos únicos
-        - **Optimizar recursos**: Entender dónde se concentra la productividad
-        - **Detectar inequidades**: Diferencias significativas entre grupos
-        """)
-    
-    tab1, tab2, tab3 = st.tabs(["🏢 Por Área", "🎭 Por Rol", "👤 Por Empleado"])
-    
-    with tab1:
-        st.write("**Análisis Detallado por Área de Trabajo**")
+def mostrar_analisis_roles(df):
+    """Análisis por roles si existe la columna"""
+    if 'rol' in df.columns and df['rol'].notna().any():
+        st.subheader("👔 Análisis por Rol")
         
-        # Estadísticas por área
-        area_stats = df_filtrado.groupby('area').agg({
-            'duracion_horas': ['count', 'mean', 'std', 'median', 'sum'],
-            'nombre': 'nunique',
-            'fecha': 'nunique'
-        }).round(2)
-        
-        area_stats.columns = ['Registros', 'Prom_Horas', 'Desv_Std', 'Mediana', 'Total_Horas', 'Empleados', 'Días_Activos']
-        area_stats = area_stats.sort_values('Total_Horas', ascending=False)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Gráfico de barras comparativo
-            fig_area = px.bar(
-                area_stats.reset_index(),
-                x='area',
-                y='Prom_Horas',
-                color='Total_Horas',
-                title="Productividad Promedio por Área",
-                color_continuous_scale='Viridis'
-            )
-            fig_area.update_layout(xaxis_title="Área", yaxis_title="Horas Promedio")
-            st.plotly_chart(fig_area, use_container_width=True)
-        
-        with col2:
-            # Box plot por área
-            fig_box_area = px.box(
-                df_filtrado,
-                x='area',
-                y='duracion_horas',
-                title="Distribución de Horas por Área"
-            )
-            fig_box_area.update_layout(xaxis_title="Área", yaxis_title="Horas Trabajadas")
-            st.plotly_chart(fig_box_area, use_container_width=True)
-        
-        # Tabla detallada
-        st.write("**Estadísticas Completas por Área**")
-        st.dataframe(area_stats, use_container_width=True)
-        
-        # ANOVA si hay múltiples áreas
-        if len(area_stats) > 1:
-            grupos_area = [df_filtrado[df_filtrado['area'] == area]['duracion_horas'].values 
-                          for area in df_filtrado['area'].unique()]
+        with st.expander("👨‍💼 ¿Qué diferencias hay entre roles?", expanded=False):
+            st.markdown("""
+            ### 🎭 **Análisis por Posición Laboral**
             
-            try:
-                f_stat, p_value = stats.f_oneway(*grupos_area)
-                if p_value < 0.05:
-                    st.success(f"🔬 **Análisis ANOVA**: Existen diferencias estadísticamente significativas entre áreas (p-value: {p_value:.4f})")
-                else:
-                    st.info(f"📊 **Análisis ANOVA**: No hay diferencias estadísticamente significativas entre áreas (p-value: {p_value:.4f})")
-            except:
-                st.info("No se pudo realizar el análisis ANOVA")
-    
-    with tab2:
-        st.write("**Análisis por Rol/Posición**")
+            **📊 Métricas por Rol:**
+            - **📈 Número de Registros**: Frecuencia de trabajo por tipo de rol
+            - **⏰ Promedio Horas**: Jornada típica según la posición
+            - **🏆 Total Horas**: Contribución total por tipo de rol
+            - **👥 Empleados Únicos**: Cuántas personas tienen cada rol
+            
+            ### 🔍 **Patrones por Rol**
+            - **Roles operativos vs. administrativos**: Diferencias en horarios
+            - **Carga de responsabilidad**: ¿Los supervisores trabajan más?
+            - **Especialización**: Roles con jornadas específicas
+            - **Distribución organizacional**: Balance entre tipos de roles
+            
+            ### 💼 **Insights Organizacionales:**
+            - **Estructura jerárquica**: Cómo se distribuye el trabajo
+            - **Necesidades de contratación**: Roles con poca representación
+            - **Equidad laboral**: Distribución justa de cargas de trabajo
+            - **Planificación de carrera**: Progresión entre roles
+            """)
+            
+        st.write("**Análisis comparativo del rendimiento y patrones de trabajo según el rol o posición**")
         
-        # Estadísticas por rol
-        rol_stats = df_filtrado.groupby('rol').agg({
-            'duracion_horas': ['count', 'mean', 'std', 'median'],
+        roles_stats = df.groupby('rol').agg({
+            'duracion_horas': ['count', 'mean', 'sum'],
             'nombre': 'nunique'
         }).round(2)
         
-        rol_stats.columns = ['Registros', 'Prom_Horas', 'Desv_Std', 'Mediana', 'Empleados']
-        rol_stats = rol_stats.sort_values('Prom_Horas', ascending=False)
+        roles_stats.columns = ['Número_Registros', 'Promedio_Horas', 'Total_Horas', 'Empleados_Únicos']
+        roles_stats = roles_stats.reset_index()
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Gráfico radial para roles
-            fig_radar = go.Figure()
-            
-            for i, (rol, stats) in enumerate(rol_stats.iterrows()):
-                fig_radar.add_trace(go.Scatterpolar(
-                    r=[stats['Prom_Horas'], stats['Registros']/10, stats['Empleados']*2, stats['Mediana']],
-                    theta=['Promedio Horas', 'Registros (÷10)', 'Empleados (×2)', 'Mediana Horas'],
-                    fill='toself',
-                    name=rol
-                ))
-            
-            fig_radar.update_layout(
-                polar=dict(radialaxis=dict(visible=True, range=[0, max(rol_stats['Prom_Horas'].max(), 20)])),
-                showlegend=True,
-                title="Perfil Multidimensional por Rol"
-            )
-            st.plotly_chart(fig_radar, use_container_width=True)
-        
-        with col2:
-            # Gráfico de barras horizontales
-            fig_rol = px.bar(
-                rol_stats.reset_index().sort_values('Prom_Horas'),
-                x='Prom_Horas',
-                y='rol',
-                orientation='h',
-                title="Horas Promedio por Rol",
-                color='Prom_Horas',
-                color_continuous_scale='Blues'
-            )
-            fig_rol.update_layout(yaxis_title="Rol", xaxis_title="Horas Promedio")
-            st.plotly_chart(fig_rol, use_container_width=True)
-        
-        st.dataframe(rol_stats, use_container_width=True)
-    
-    with tab3:
-        st.write("**Análisis Individual por Empleado**")
-        
-        # Top performers
-        empleado_stats = df_filtrado.groupby('nombre').agg({
-            'duracion_horas': ['count', 'mean', 'std', 'sum'],
-            'fecha': 'nunique',
-            'area': lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else 'N/A',
-            'rol': lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else 'N/A'
-        }).round(2)
-        
-        empleado_stats.columns = ['Registros', 'Prom_Horas', 'Desv_Std', 'Total_Horas', 'Días_Trabajados', 'Área_Principal', 'Rol_Principal']
-        empleado_stats = empleado_stats.sort_values('Total_Horas', ascending=False)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Top 10 empleados por horas totales
-            top_10 = empleado_stats.head(10)
-            fig_top = px.bar(
-                top_10.reset_index(),
-                x='Total_Horas',
-                y='nombre',
-                orientation='h',
-                title="Top 10: Empleados por Horas Totales",
-                color='Prom_Horas',
-                color_continuous_scale='Greens'
-            )
-            fig_top.update_layout(yaxis={'categoryorder': 'total ascending'})
-            st.plotly_chart(fig_top, use_container_width=True)
-        
-        with col2:
-            # Distribución de consistencia (coeficiente de variación)
-            empleado_stats['CV'] = (empleado_stats['Desv_Std'] / empleado_stats['Prom_Horas']) * 100
-            
-            fig_cv = px.histogram(
-                empleado_stats,
-                x='CV',
-                nbins=15,
-                title="Distribución de Consistencia (Coef. Variación)",
-                labels={'CV': 'Coeficiente de Variación (%)', 'count': 'Número de Empleados'}
-            )
-            st.plotly_chart(fig_cv, use_container_width=True)
-        
-        # Ranking completo (primeros 20)
-        st.write("**Ranking de Empleados (Top 20)**")
-        ranking = empleado_stats.head(20).copy()
-        ranking.index.name = 'Empleado'
-        st.dataframe(ranking, use_container_width=True)
-        
-        # Empleados más consistentes (menor CV)
-        if len(empleado_stats) > 1:
-            consistentes = empleado_stats[empleado_stats['Registros'] >= 3].nsmallest(5, 'CV')
-            if len(consistentes) > 0:
-                st.success(f"🎯 **Empleados más consistentes**: {', '.join(consistentes.index.tolist())}")
+        st.dataframe(roles_stats, use_container_width=True, hide_index=True)
 
 
-def mostrar_analisis_correlacion(df_filtrado):
-    """Análisis de correlaciones y relaciones entre variables"""
-    st.subheader("🔗 Análisis de Correlaciones")
+def mostrar_datos_detallados(df):
+    """Mostrar tabla de datos detallados con filtros"""
+    st.subheader("🔍 Datos Detallados")
     
-    with st.expander("📊 Interpretación de correlaciones", expanded=False):
+    with st.expander("🔧 ¿Cómo usar los filtros de datos?", expanded=False):
         st.markdown("""
-        Las **correlaciones** miden la relación lineal entre variables:
+        ### 🎛️ **Sistema de Filtros Interactivos**
         
-        - **+1.0**: Correlación positiva perfecta
-        - **+0.7 a +0.9**: Correlación fuerte positiva  
-        - **+0.3 a +0.7**: Correlación moderada positiva
-        - **-0.3 a +0.3**: Correlación débil o nula
-        - **-0.3 a -0.7**: Correlación moderada negativa
-        - **-0.7 a -0.9**: Correlación fuerte negativa
-        - **-1.0**: Correlación negativa perfecta
+        **👤 Filtro por Empleado:**
+        - Selecciona **"Todos"** para ver todos los empleados
+        - Escoge un **empleado específico** para análisis individual
+        - Útil para **evaluaciones de desempeño** o seguimiento personal
+        
+        **📅 Filtro por Rango de Fechas:**
+        - Define el **período específico** que quieres analizar
+        - Arrastra los controles para **ajustar fechas** de inicio y fin
+        - Perfect para análisis de **períodos específicos** o comparaciones temporales
+        
+        ### 🎯 **¿Cómo aprovechar esta tabla?**
+        - **Verificar datos individuales**: Revisar registros específicos
+        - **Detectar inconsistencias**: Identificar horarios inusuales
+        - **Análisis de casos**: Estudiar empleados o períodos específicos
+        - **Validación de información**: Confirmar datos antes de tomar decisiones
+        
+        ### 💡 **Tips de uso:**
+        - Combina **múltiples filtros** para análisis más precisos
+        - La tabla se **actualiza automáticamente** al cambiar filtros
+        - Usa el **contador de registros** para evaluar el tamaño de la muestra
         """)
     
-    # Preparar variables numéricas para correlación
-    variables_numericas = ['duracion_horas', 'hora_entrada_num', 'hora_salida_num']
-    
-    # Agregar variables derivadas por empleado
-    empleado_metricas = df_filtrado.groupby('nombre').agg({
-        'duracion_horas': ['mean', 'std', 'count'],
-        'hora_entrada_num': 'mean',
-        'hora_salida_num': 'mean',
-        'fecha': 'nunique'
-    }).round(3)
-    
-    empleado_metricas.columns = ['Prom_Duración', 'Std_Duración', 'Num_Registros', 'Prom_Entrada', 'Prom_Salida', 'Días_Únicos']
+    st.write("**Tabla completa de registros con filtros interactivos para análisis detallado**")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # Matriz de correlación de variables básicas
-        if len(df_filtrado) > 1:
-            corr_basic = df_filtrado[variables_numericas].corr()
-            
-            fig_corr1 = px.imshow(
-                corr_basic,
-                text_auto='.3f',
-                aspect="auto",
-                title="Correlación: Variables de Horarios",
-                color_continuous_scale='RdBu_r'
-            )
-            st.plotly_chart(fig_corr1, use_container_width=True)
+        # Filtro por empleado
+        empleados = ['Todos'] + sorted(df['nombre'].unique().tolist())
+        empleado_seleccionado = st.selectbox("Filtrar por Empleado:", empleados)
     
     with col2:
-        # Matriz de correlación de métricas por empleado
-        if len(empleado_metricas) > 1:
-            corr_emp = empleado_metricas.corr()
-            
-            fig_corr2 = px.imshow(
-                corr_emp,
-                text_auto='.3f',
-                aspect="auto", 
-                title="Correlación: Métricas por Empleado",
-                color_continuous_scale='RdBu_r'
-            )
-            st.plotly_chart(fig_corr2, use_container_width=True)
-    
-    # Análisis de correlaciones específicas
-    st.write("**Análisis de Relaciones Específicas**")
-    
-    tab1, tab2 = st.tabs(["📈 Scatter Plots", "🔍 Análisis Estadístico"])
-    
-    with tab1:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Relación: Hora entrada vs Duración
-            fig_scatter1 = px.scatter(
-                df_filtrado,
-                x='hora_entrada_num',
-                y='duracion_horas',
-                color='area',
-                size='duracion_horas',
-                title="Hora de Entrada vs Duración",
-                trendline="ols"
-            )
-            st.plotly_chart(fig_scatter1, use_container_width=True)
-        
-        with col2:
-            # Relación: Registros vs Promedio (por empleado)
-            fig_scatter2 = px.scatter(
-                empleado_metricas.reset_index(),
-                x='Num_Registros',
-                y='Prom_Duración',
-                color='Std_Duración',
-                title="Registros vs Duración Promedio (por empleado)",
-                hover_name='nombre'
-            )
-            st.plotly_chart(fig_scatter2, use_container_width=True)
-    
-    with tab2:
-        # Análisis estadístico de correlaciones importantes
-        if len(df_filtrado) > 2:
-            # Correlación entrada-duración
-            corr_entrada_duracion = df_filtrado['hora_entrada_num'].corr(df_filtrado['duracion_horas'])
-            
-            # Test de significancia
-            from scipy.stats import pearsonr
-            try:
-                corr_coef, p_value = pearsonr(df_filtrado['hora_entrada_num'], df_filtrado['duracion_horas'])
-                
-                st.write("**🔬 Análisis Estadístico de Correlaciones**")
-                
-                resultados = pd.DataFrame({
-                    'Relación': [
-                        'Hora Entrada ↔ Duración',
-                        'Hora Entrada ↔ Hora Salida', 
-                        'Significancia Estadística'
-                    ],
-                    'Coeficiente': [
-                        f"{corr_entrada_duracion:.3f}",
-                        f"{df_filtrado['hora_entrada_num'].corr(df_filtrado['hora_salida_num']):.3f}",
-                        f"p-value: {p_value:.4f}"
-                    ],
-                    'Interpretación': [
-                        'Moderada negativa' if corr_entrada_duracion < -0.3 else 'Débil' if abs(corr_entrada_duracion) < 0.3 else 'Moderada positiva',
-                        'Fuerte positiva' if df_filtrado['hora_entrada_num'].corr(df_filtrado['hora_salida_num']) > 0.7 else 'Moderada',
-                        'Significativa' if p_value < 0.05 else 'No significativa'
-                    ]
-                })
-                
-                st.dataframe(resultados, use_container_width=True, hide_index=True)
-                
-            except Exception as e:
-                st.info("No se pudo realizar el análisis de significancia estadística")
-
-
-def mostrar_exploracion_datos():
-    """Función principal que muestra toda la exploración de datos"""
-    st.sidebar.info("🔬 Realiza un análisis exhaustivo de los datos de horarios laborales con herramientas estadísticas avanzadas.")
-    
-    try:
-        # Cargar datos
-        datos = cargar_datos_api()
-        
-        if datos is None or datos.empty:
-            st.error("❌ No se pudieron cargar los datos de la API o no hay datos disponibles.")
-            return
-        
-        # Título principal
-        st.title("🔬 Exploración Avanzada de Datos")
-        st.markdown("### 📊 Análisis Estadístico Completo de Horarios Laborales")
-        
-        # Descripción del módulo
-        with st.expander("🎯 ¿Qué hace este módulo de exploración?", expanded=True):
-            st.markdown("""
-            Este módulo realiza un **análisis estadístico completo** de los datos de horarios laborales:
-            
-            #### 🔍 **Análisis Incluidos:**
-            - **📈 Estadísticas Descriptivas**: Medidas de tendencia central, dispersión y distribución
-            - **⏰ Análisis Temporal**: Patrones por días, tendencias, estacionalidad
-            - **👥 Segmentación**: Comparación entre áreas, roles y empleados individuales
-            - **🔗 Correlaciones**: Relaciones entre variables y su significancia estadística
-            - **📊 Visualizaciones Avanzadas**: Gráficos interactivos y dashboards
-            
-            #### 🎯 **Objetivos:**
-            - Identificar patrones ocultos en los datos
-            - Detectar anomalías y outliers
-            - Optimizar la gestión de recursos humanos
-            - Proporcionar insights basados en evidencia estadística
-            """)
-        
-        # Información general de los datos
-        st.success(f"✅ **Datos cargados correctamente**: {len(datos):,} registros desde la API")
-        
-        # Métricas principales
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            st.metric("👥 Empleados", f"{datos['nombre'].nunique()}")
-        with col2:
-            st.metric("🏢 Áreas", f"{datos['area'].nunique()}")  
-        with col3:
-            st.metric("🎭 Roles", f"{datos['rol'].nunique()}")
-        with col4:
-            st.metric("📅 Días", f"{datos['fecha'].nunique()}")
-        with col5:
-            if 'duracion_horas' in datos.columns:
-                st.metric("⏱️ Prom. Horas", f"{datos['duracion_horas'].mean():.1f}h")
-        
-        st.divider()
-        
-        # === PANEL DE FILTROS AVANZADOS ===
-        st.sidebar.markdown("## 🎛️ **Panel de Control Avanzado**")
-        st.sidebar.markdown("*Personaliza tu análisis con filtros inteligentes*")
-        
-        # Filtros básicos
-        st.sidebar.markdown("### 🔍 **Filtros Básicos**")
-        
-        nombres = datos['nombre'].unique()
-        nombre_sel = st.sidebar.selectbox(
-            "👤 Empleado", 
-            options=['Todos'] + list(nombres),
-            help="Analizar empleado específico"
-        )
-        
-        areas = datos['area'].unique()
-        areas_sel = st.sidebar.multiselect(
-            "🏢 Área(s)", 
-            options=areas, 
-            default=list(areas),
-            help="Seleccionar áreas a comparar"
-        )
-        
-        roles = datos['rol'].unique()
-        roles_sel = st.sidebar.multiselect(
-            "🎭 Rol(es)", 
-            options=roles, 
-            default=list(roles),
-            help="Filtrar por tipos de trabajo"
-        )
-        
-        # Filtros temporales avanzados
-        st.sidebar.markdown("### 📅 **Filtros Temporales**")
-        
-        fecha_min = datos['fecha'].min().date()
-        fecha_max = datos['fecha'].max().date()
-        fecha_inicio, fecha_fin = st.sidebar.date_input(
-            "📅 Período de análisis",
+        # Filtro por rango de fechas
+        fecha_min = df['fecha'].min().date()
+        fecha_max = df['fecha'].max().date()
+        fecha_inicio, fecha_fin = st.date_input(
+            "Rango de Fechas:",
             value=(fecha_min, fecha_max),
             min_value=fecha_min,
             max_value=fecha_max
         )
-        
-        # Filtro por productividad
-        nivel_productividad = st.sidebar.selectbox(
-            "⚡ Nivel de productividad",
-            options=['Todos', 'Alta (>10h)', 'Normal (7-10h)', 'Baja (<7h)'],
-            help="Segmentar por niveles de rendimiento"
-        )
-        
-        # Filtros estadísticos avanzados
-        st.sidebar.markdown("### 📊 **Filtros Estadísticos**")
-        
-        # Filtro por percentiles
-        percentil_filtro = st.sidebar.slider(
-            "📈 Filtrar por percentil de horas",
-            min_value=0, max_value=100,
-            value=(0, 100),
-            help="Excluir outliers por percentiles"
-        )
-        
-        # Filtro de consistencia (coeficiente de variación)
-        incluir_consistencia = st.sidebar.checkbox(
-            "🎯 Solo empleados consistentes (CV < 30%)",
-            value=False,
-            help="Filtrar empleados con horarios regulares"
-        )
-        
-        # === APLICAR FILTROS ===
-        datos_filtrados = datos.copy()
-        
-        # Filtros básicos
-        if nombre_sel != 'Todos':
-            datos_filtrados = datos_filtrados[datos_filtrados['nombre'] == nombre_sel]
-        if areas_sel:
-            datos_filtrados = datos_filtrados[datos_filtrados['area'].isin(areas_sel)]
-        if roles_sel:
-            datos_filtrados = datos_filtrados[datos_filtrados['rol'].isin(roles_sel)]
-        
-        # Filtros temporales
-        datos_filtrados = datos_filtrados[
-            (datos_filtrados['fecha'].dt.date >= fecha_inicio) &
-            (datos_filtrados['fecha'].dt.date <= fecha_fin)
-        ]
-        
-        # Filtro por productividad
-        if nivel_productividad != 'Todos' and 'duracion_horas' in datos_filtrados.columns:
-            if nivel_productividad == 'Alta (>10h)':
-                datos_filtrados = datos_filtrados[datos_filtrados['duracion_horas'] > 10]
-            elif nivel_productividad == 'Normal (7-10h)':
-                datos_filtrados = datos_filtrados[
-                    (datos_filtrados['duracion_horas'] >= 7) & 
-                    (datos_filtrados['duracion_horas'] <= 10)
-                ]
-            elif nivel_productividad == 'Baja (<7h)':
-                datos_filtrados = datos_filtrados[datos_filtrados['duracion_horas'] < 7]
-        
-        # Filtro por percentiles
-        if 'duracion_horas' in datos_filtrados.columns:
-            p_min = np.percentile(datos_filtrados['duracion_horas'], percentil_filtro[0])
-            p_max = np.percentile(datos_filtrados['duracion_horas'], percentil_filtro[1])
-            datos_filtrados = datos_filtrados[
-                (datos_filtrados['duracion_horas'] >= p_min) & 
-                (datos_filtrados['duracion_horas'] <= p_max)
-            ]
-        
-        # Filtro de consistencia
-        if incluir_consistencia:
-            empleados_cv = datos_filtrados.groupby('nombre')['duracion_horas'].agg(['mean', 'std']).reset_index()
-            empleados_cv['cv'] = (empleados_cv['std'] / empleados_cv['mean']) * 100
-            empleados_consistentes = empleados_cv[empleados_cv['cv'] < 30]['nombre'].tolist()
-            datos_filtrados = datos_filtrados[datos_filtrados['nombre'].isin(empleados_consistentes)]
-        
-        # Mostrar resumen de filtros aplicados
-        if len(datos_filtrados) != len(datos):
-            st.info(f"🔍 **Filtros aplicados**: Mostrando {len(datos_filtrados):,} de {len(datos):,} registros ({(len(datos_filtrados)/len(datos)*100):.1f}%)")
-        
-        # Validar que hay datos suficientes
-        if len(datos_filtrados) < 2:
-            st.warning("⚠️ Los filtros seleccionados resultan en muy pocos datos para realizar análisis estadísticos significativos.")
-            return
-        
-        # === ANÁLISIS COMPLETO ===
-        
-        # 1. Estadísticas Descriptivas
-        mostrar_estadisticas_descriptivas(datos_filtrados)
-        
-        st.divider()
-        
-        # 2. Análisis Temporal
-        mostrar_analisis_temporal(datos_filtrados)
-        
-        st.divider()
-        
-        # 3. Análisis por Grupos
-        mostrar_analisis_por_grupos(datos_filtrados)
-        
-        st.divider()
-        
-        # 4. Análisis de Correlaciones
-        mostrar_analisis_correlacion(datos_filtrados)
-        
-        st.divider()
-        
-        # === RESUMEN EJECUTIVO ===
-        st.subheader("📋 Resumen Ejecutivo del Análisis")
-        
-        with st.expander("📊 Principales hallazgos y recomendaciones", expanded=True):
-            if 'duracion_horas' in datos_filtrados.columns:
-                # Calcular métricas clave
-                prom_horas = datos_filtrados['duracion_horas'].mean()
-                std_horas = datos_filtrados['duracion_horas'].std()
-                cv_general = (std_horas / prom_horas) * 100
-                
-                # Identificar patrones
-                mejor_area = datos_filtrados.groupby('area')['duracion_horas'].mean().idxmax()
-                peor_area = datos_filtrados.groupby('area')['duracion_horas'].mean().idxmin()
-                
-                empleados_total = datos_filtrados['nombre'].nunique()
-                registros_por_empleado = len(datos_filtrados) / empleados_total if empleados_total > 0 else 0
-                
-                st.markdown(f"""
-                ### 🎯 **Hallazgos Principales:**
-                
-                **📊 Productividad General:**
-                - Promedio de horas trabajadas: **{prom_horas:.2f} horas** por jornada
-                - Variabilidad: **{cv_general:.1f}%** (Coeficiente de Variación)
-                - Total de empleados analizados: **{empleados_total}**
-                - Registros promedio por empleado: **{registros_por_empleado:.1f}**
-                
-                **🏢 Performance por Área:**
-                - Área más productiva: **{mejor_area}**
-                - Área con menor productividad: **{peor_area}**
-                
-                **⚡ Recomendaciones:**
-                - {"Excelente consistencia en horarios" if cv_general < 15 else "Considerar estandarizar horarios" if cv_general > 25 else "Variabilidad aceptable"}
-                - {"Productividad alta, mantener estrategias actuales" if prom_horas > 8.5 else "Evaluar causas de baja productividad" if prom_horas < 7 else "Productividad en rango normal"}
-                - Implementar mejores prácticas de **{mejor_area}** en otras áreas
-                """)
-        
-        # Exportar datos filtrados (opcional)
-        if st.button("📥 Descargar datos filtrados (CSV)", help="Descargar los datos actuales para análisis externos"):
-            csv = datos_filtrados.to_csv(index=False)
-            st.download_button(
-                label="⬇️ Descargar CSV",
-                data=csv,
-                file_name=f"datos_horarios_filtrados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-        
-    except Exception as e:
-        st.error(f"❌ Error durante el análisis: {e}")
-        st.info("💡 Intenta ajustar los filtros o contacta al administrador del sistema.")
+    
+    # Aplicar filtros
+    df_filtrado = df.copy()
+    
+    if empleado_seleccionado != 'Todos':
+        df_filtrado = df_filtrado[df_filtrado['nombre'] == empleado_seleccionado]
+    
+    df_filtrado = df_filtrado[
+        (df_filtrado['fecha'].dt.date >= fecha_inicio) & 
+        (df_filtrado['fecha'].dt.date <= fecha_fin)
+    ]
+    
+    # Mostrar datos filtrados
+    st.write(f"**Mostrando {len(df_filtrado)} registros de {len(df)} totales**")
+    
+    # Seleccionar columnas a mostrar
+    columnas_mostrar = ['nombre', 'fecha', 'hora_entrada', 'hora_salida', 'duracion_horas', 'dia_semana_es']
+    if 'area' in df.columns:
+        columnas_mostrar.append('area')
+    if 'rol' in df.columns:
+        columnas_mostrar.append('rol')
+    
+    df_mostrar = df_filtrado[columnas_mostrar].copy()
+    df_mostrar['fecha'] = df_mostrar['fecha'].dt.strftime('%Y-%m-%d')
+    df_mostrar['duracion_horas'] = df_mostrar['duracion_horas'].round(2)
+    
+    st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
 
 
-# Función principal para ser llamada desde la aplicación principal
-def main():
-    mostrar_exploracion_datos()
+def mostrar_resumen_ejecutivo(df):
+    """Mostrar resumen ejecutivo con insights clave"""
+    st.subheader("📋 Resumen Ejecutivo")
+    
+    with st.expander("💼 ¿Qué es el Resumen Ejecutivo?", expanded=False):
+        st.markdown("""
+        ### 🎯 **Síntesis de Hallazgos Clave**
+        
+        El **resumen ejecutivo** condensa los insights más importantes del análisis
+        en información **accionable** para la toma de decisiones gerenciales.
+        
+        ### 📊 **Incluye:**
+        - **Métricas principales** del período analizado
+        - **Identificación de patrones** críticos
+        - **Recomendaciones** basadas en datos
+        - **Alertas** sobre situaciones que requieren atención
+        - **Oportunidades** de mejora organizacional
+        """)
+    
+    # Calcular métricas clave
+    total_empleados = df['nombre'].nunique()
+    total_registros = len(df)
+    promedio_horas = df['duracion_horas'].mean()
+    total_horas_periodo = df['duracion_horas'].sum()
+    
+    # Métricas en cards
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "👥 Empleados Activos", 
+            total_empleados,
+            help="Número total de empleados con registros"
+        )
+    
+    with col2:
+        st.metric(
+            "📝 Total Registros", 
+            total_registros,
+            help="Total de entradas de horarios procesadas"
+        )
+    
+    with col3:
+        st.metric(
+            "⏱️ Promedio Horas/Día", 
+            f"{promedio_horas:.1f}",
+            help="Duración promedio de jornada laboral"
+        )
+    
+    with col4:
+        st.metric(
+            "🏆 Total Horas Período", 
+            f"{total_horas_periodo:.0f}",
+            help="Suma total de horas trabajadas"
+        )
+    
+    # Insights automáticos
+    st.write("### 🔍 **Insights Clave del Análisis**")
+    
+    # Análisis de productividad
+    horas_optimas = (promedio_horas >= 7.5) and (promedio_horas <= 9)
+    variabilidad = df['duracion_horas'].std()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**⚡ Productividad General**")
+        if horas_optimas:
+            st.success("✅ Promedio de horas en rango óptimo (7.5-9h)")
+        elif promedio_horas < 7.5:
+            st.warning("⚠️ Promedio de horas por debajo del estándar")
+        else:
+            st.info("📈 Promedio de horas por encima del estándar")
+            
+        if variabilidad < 1.5:
+            st.success("✅ Horarios muy consistentes entre empleados")
+        elif variabilidad < 2.5:
+            st.info("📊 Variabilidad moderada en horarios")
+        else:
+            st.warning("⚠️ Alta variabilidad - revisar inconsistencias")
+    
+    with col2:
+        st.write("**📊 Cobertura de Datos**")
+        
+        # Análisis de cobertura temporal
+        rango_fechas = (df['fecha'].max() - df['fecha'].min()).days + 1
+        dias_unicos = df['fecha'].nunique()
+        cobertura = (dias_unicos / rango_fechas) * 100
+        
+        if cobertura > 80:
+            st.success(f"✅ Excelente cobertura de datos ({cobertura:.1f}%)")
+        elif cobertura > 60:
+            st.info(f"📊 Buena cobertura de datos ({cobertura:.1f}%)")
+        else:
+            st.warning(f"⚠️ Cobertura limitada ({cobertura:.1f}%) - faltan datos")
+        
+        # Análisis de empleados
+        registros_por_empleado = total_registros / total_empleados
+        if registros_por_empleado > 10:
+            st.success(f"✅ Buen historial por empleado ({registros_por_empleado:.1f} reg/persona)")
+        else:
+            st.info(f"📊 Datos limitados por empleado ({registros_por_empleado:.1f} reg/persona)")
+    
+    # Recomendaciones automáticas
+    st.write("### 💡 **Recomendaciones Basadas en Datos**")
+    
+    recomendaciones = []
+    
+    if promedio_horas > 9:
+        recomendaciones.append("🔄 **Revisar carga de trabajo** - El promedio de horas es alto, considerar redistribución")
+    
+    if variabilidad > 2:
+        recomendaciones.append("📏 **Estandarizar horarios** - Alta variabilidad sugiere falta de políticas claras")
+    
+    if cobertura < 70:
+        recomendaciones.append("📊 **Mejorar registro de datos** - Cobertura insuficiente para análisis precisos")
+    
+    # Análisis por día de la semana si hay datos suficientes
+    if df['dia_semana_es'].nunique() >= 5:
+        dias_stats = df.groupby('dia_semana_es')['duracion_horas'].sum()
+        if dias_stats.std() > dias_stats.mean() * 0.3:
+            recomendaciones.append("📅 **Balancear carga semanal** - Distribución desigual entre días")
+    
+    if not recomendaciones:
+        st.success("🎉 **¡Excelente!** No se detectaron áreas críticas de mejora en los datos actuales")
+    else:
+        for i, rec in enumerate(recomendaciones, 1):
+            st.write(f"{i}. {rec}")
+    
+    # Próximos pasos sugeridos
+    st.write("### 🎯 **Próximos Pasos Sugeridos**")
+    
+    pasos = [
+        "🔍 **Análisis profundo** de empleados con patrones atípicos",
+        "📈 **Seguimiento temporal** para identificar tendencias",
+        "🏢 **Comparación entre áreas** para optimización de recursos",
+        "📋 **Implementar KPIs** basados en estos hallazgos",
+        "🔄 **Revisión periódica** de estos indicadores"
+    ]
+    
+    for paso in pasos:
+        st.write(f"• {paso}")
+
+
+def mostrar_exploracion_datos():
+    """Función principal para mostrar la exploración de datos"""
+    st.title("📊 Exploración de Datos - Horarios Laborales")
+    
+    # Información sobre la aplicación de exploración de datos
+    with st.expander("ℹ️ ¿Qué es la Exploración de Datos?", expanded=False):
+        st.markdown("""
+        ### 🎯 **Propósito del Análisis Exploratorio**
+        La **exploración de datos** es el proceso de examinar y analizar conjuntos de datos para 
+        descubrir patrones, identificar anomalías, verificar suposiciones y obtener insights útiles.
+        
+        ### 🔍 **¿Qué encontrarás en esta sección?**
+        - 📈 **Estadísticas descriptivas**: Medidas centrales y de dispersión
+        - 👥 **Análisis por empleado**: Rendimiento individual detallado
+        - 📅 **Patrones temporales**: Tendencias por días y meses
+        - 🏢 **Comparación por áreas**: Productividad departamental
+        - 👔 **Análisis por roles**: Comportamientos según posición
+        - 🔍 **Datos detallados**: Tabla completa con filtros avanzados
+        
+        ### 💡 **¿Para qué sirve?**
+        - **Identificar patrones** de comportamiento laboral
+        - **Detectar anomalías** en horarios de trabajo
+        - **Optimizar recursos** humanos por área
+        - **Tomar decisiones** basadas en datos reales
+        - **Mejorar la productividad** organizacional
+        """)
+    
+    st.write("**Análisis completo de los datos de horarios usando tablas interactivas y métricas clave**")
+    
+    # Cargar datos con información detallada
+    with st.spinner("🔄 Cargando datos desde la API..."):
+        df = cargar_datos_api()
+    
+    if df is not None and not df.empty:
+        st.success(f"✅ **Datos cargados exitosamente**: {len(df)} registros procesados desde la API")
+        
+        # Información rápida sobre los datos cargados
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.info(f"👥 **{df['nombre'].nunique()}** Empleados")
+        with col2:
+            if 'area' in df.columns:
+                st.info(f"🏢 **{df['area'].nunique()}** Áreas")
+            else:
+                st.info("🏢 **Áreas**: N/A")
+        with col3:
+            if 'rol' in df.columns:
+                st.info(f"🎭 **{df['rol'].nunique()}** Roles")
+            else:
+                st.info("🎭 **Roles**: N/A")
+        with col4:
+            fecha_range = f"{df['fecha'].min().strftime('%d/%m/%Y')} - {df['fecha'].max().strftime('%d/%m/%Y')}"
+            st.info(f"📅 **Período**: {fecha_range}")
+        
+        st.divider()
+    
+    if df is not None and not df.empty:
+        # Mostrar diferentes secciones de análisis
+        mostrar_resumen_general(df)
+        
+        st.divider()
+        mostrar_estadisticas_basicas(df)
+        
+        st.divider()
+        mostrar_analisis_empleados(df)
+        
+        st.divider()
+        mostrar_analisis_temporal(df)
+        
+        st.divider()
+        mostrar_analisis_areas(df)
+        
+        st.divider()
+        mostrar_analisis_roles(df)
+        
+        st.divider()
+        mostrar_datos_detallados(df)
+        
+        # Sección de resumen ejecutivo
+        st.divider()
+        mostrar_resumen_ejecutivo(df)
+        
+    else:
+        st.error("No se pudieron cargar los datos o no hay datos disponibles.")
 
 
 if __name__ == "__main__":
-    main()
+    mostrar_exploracion_datos()

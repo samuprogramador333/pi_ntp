@@ -4,7 +4,7 @@ import pandas as pd
 from pages.app1 import mostrar_horarios
 from pages.app2 import mostrar_RegistroEducativos
 from pages.app4_ExploracionDatos import mostrar_exploracion_datos
-from pages.app5_ExploracionDatos import mostrar_exploracion_centros_educativos
+from pages.app5_ExploracionDatos import mostrar_exploracion_datos_educativos
 
 st.set_page_config(
     page_title="Panel Principal - Sistema de Gestión", 
@@ -294,5 +294,5 @@ elif opcion == "🎓 Centros Educativos":
 elif opcion == "📈 Exploración de Datos":
     mostrar_exploracion_datos()
 elif opcion == "🏫 Exploración Centros Educativos":
-    mostrar_exploracion_centros_educativos()
+    mostrar_exploracion_datos_educativos()
 
