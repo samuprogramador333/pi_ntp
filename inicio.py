@@ -286,6 +286,46 @@ if opcion == "🏠 Inicio":
     **📊 Fuentes de datos:** API MockAPI + Archivos CSV | 
     **🔄 Última actualización:** Octubre 2025
     """)
+    
+    # Sección de desarrolladores
+    st.divider()
+    st.subheader("👨‍💻 Equipo de Desarrollo")
+    
+    # Mostrar los nombres en columnas para mejor presentación
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown("""
+        ### 🧑‍💼 Samuel Bernal
+        **Desarrollador Principal**
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### 👨‍💻 Harrison Rengifo
+        **Analista de Datos**
+        """)
+    
+    with col3:
+        st.markdown("""
+        ### 🎯 Cristian Sierra
+        **Especialista Backend**
+        """)
+    
+    with col4:
+        st.markdown("""
+        ### 📊 Sebastian Garcia
+        **Desarrollador Frontend**
+        """)
+    
+    # Footer adicional con los nombres
+    st.markdown("""
+    ---
+    <div style="text-align: center; color: #666; font-size: 14px; padding: 20px;">
+        <b>Desarrollado por:</b> Samuel Bernal • Harrison Rengifo • Cristian Sierra • Sebastian Garcia<br>
+        <i>Sistema de Gestión y Análisis de Datos - 2025</i>
+    </div>
+    """, unsafe_allow_html=True)
 
 elif opcion == "⏰ Registro de Horarios":
     mostrar_horarios()
